@@ -170,7 +170,15 @@ function getApiError(error: unknown): string {
 // ============================================================
 
 function StudentDashboard() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
+
+  // DashboardHeader expects full_name to be optional rather than null.
+  const headerUser = user
+    ? {
+        ...user,
+        full_name: user.full_name ?? undefined,
+      }
+    : null
 
   const [dashboard, setDashboard] = useState<StudentDashboardResponse | null>(null)
 
@@ -220,7 +228,13 @@ function StudentDashboard() {
   // ==========================================================
 
   useEffect(() => {
-    void loadDashboard()
+    const timeoutId = window.setTimeout(() => {
+      void loadDashboard()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [loadDashboard])
 
   // ==========================================================
@@ -242,7 +256,11 @@ function StudentDashboard() {
         {/* FLOATING NAVBAR */}
 
         <div className="fixed inset-x-0 top-0 z-50">
-          <DashboardHeader user={user} onLogout={logout} />
+          <DashboardHeader user={headerUser} isSidebarCollapsed={false} onToggleSidebar={function (): void {
+            throw new Error('Function not implemented.')
+          } } onMenuClick={function (): void {
+            throw new Error('Function not implemented.')
+          } } />
         </div>
 
         {/* CONTENT */}
@@ -339,7 +357,11 @@ function StudentDashboard() {
         {/* FLOATING NAVBAR */}
 
         <div className="fixed inset-x-0 top-0 z-50">
-          <DashboardHeader user={user} onLogout={logout} />
+          <DashboardHeader user={headerUser} isSidebarCollapsed={false} onToggleSidebar={function (): void {
+            throw new Error('Function not implemented.')
+          } } onMenuClick={function (): void {
+            throw new Error('Function not implemented.')
+          } } />
         </div>
 
         {/* CONTENT */}
@@ -537,7 +559,11 @@ function StudentDashboard() {
           z-50
         "
       >
-        <DashboardHeader user={user} onLogout={logout} />
+        <DashboardHeader user={headerUser} isSidebarCollapsed={false} onToggleSidebar={function (): void {
+          throw new Error('Function not implemented.')
+        } } onMenuClick={function (): void {
+          throw new Error('Function not implemented.')
+        } } />
       </div>
 
       {/* ======================================================
@@ -1253,7 +1279,7 @@ function StudentDashboard() {
 
               <div className="overflow-x-auto">
                 {recent_attendance.length > 0 ? (
-                  <table className="w-full min-w-[720px] border-collapse">
+                  <table className="w-full min-w-180 border-collapse">
                     <thead>
                       <tr
                         className="

@@ -292,7 +292,7 @@ function AIPage() {
         <div
           className="
           absolute
-          right-[-120px]
+          -right-30
           top-1/3
           h-96
           w-96
@@ -305,7 +305,7 @@ function AIPage() {
         <div
           className="
           absolute
-          bottom-[-100px]
+          -bottom-25
           left-1/2
           h-80
           w-80

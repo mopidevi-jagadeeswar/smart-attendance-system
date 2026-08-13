@@ -13,18 +13,27 @@ function PublicNavbar() {
   return (
     <header
       className="
-        fixed inset-x-0 top-0 z-50
-        border-b border-white/5
-        bg-neutral-950/80
-        backdrop-blur-xl
+        fixed
+        inset-x-0
+        top-0
+        z-50
+        h-18
+        border-b
+        border-white/10
+        bg-black
+        px-4
+        sm:px-6
+        lg:px-8
       "
     >
       <div
         className="
-          mx-auto flex h-[72px]
-          w-full max-w-7xl
-          items-center justify-between
-          px-6 sm:px-8 lg:px-10
+          mx-auto
+          flex
+          h-full
+          max-w-7xl
+          items-center
+          justify-between
         "
       >
         {/* =====================================================
@@ -32,7 +41,7 @@ function PublicNavbar() {
         ====================================================== */}
 
         <div className="flex items-center">
-          {/* Home / Logo */}
+          {/* Home */}
 
           <Link
             to="/"

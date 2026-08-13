@@ -11,13 +11,16 @@ import AdminAttendancePage from './pages/admin/AdminAttendancePage'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminNoticesPage from './pages/admin/AdminNoticesPage'
 import AttendanceHistoryPage from './pages/admin/AttendanceHistoryPage'
+import BehavioralAnalysisPage from './pages/admin/BehavioralAnalysisPage'
 import FaceDataPage from './pages/admin/FaceDataPage'
 import FacultyPage from './pages/admin/FacultyPage'
+import ModelStatusPage from './pages/admin/ModelStatusPage'
 import NFCPage from './pages/admin/NFCPage'
 import RegisterFaculty from './pages/admin/RegisterFaculty'
 import RegisterStudent from './pages/admin/RegisterStudent'
 import ReportsPage from './pages/admin/ReportsPage'
 import StudentsPage from './pages/admin/StudentsPage'
+import TrainModelPage from './pages/admin/TrainModelPage'
 import UsersPage from './pages/admin/UsersPage'
 
 // ============================================================
@@ -34,6 +37,7 @@ import StudentDashboard from './pages/student/StudentDashboard'
 import AIPage from './pages/public/AIPage'
 import AttendancePage from './pages/public/AttendancePage'
 import CalendarPage from './pages/public/CalendarPage'
+import ForgotPasswordPage from './pages/public/ForgotPasswordPage'
 import HomePage from './pages/public/HomePage'
 import LoginPage from './pages/public/LoginPage'
 import NoticesPage from './pages/public/NoticesPage'
@@ -61,6 +65,12 @@ function App() {
         <Route path="/ai" element={<AIPage />} />
 
         <Route path="/login" element={<LoginPage />} />
+
+        {/* ====================================================
+            FORGOT PASSWORD
+        ===================================================== */}
+
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* ====================================================
             STUDENT
@@ -137,6 +147,20 @@ function App() {
             <Route path="/admin/face-data" element={<FaceDataPage />} />
 
             {/* ==================================================
+                FACE RECOGNITION MODEL
+            ================================================== */}
+
+            <Route path="/admin/train-model" element={<TrainModelPage />} />
+
+            <Route path="/admin/model-status" element={<ModelStatusPage />} />
+
+            {/* ==================================================
+                BEHAVIORAL ANALYSIS
+            ================================================== */}
+
+            <Route path="/admin/behavioral-analysis" element={<BehavioralAnalysisPage />} />
+
+            {/* ==================================================
                 NFC
             ================================================== */}
 
@@ -155,6 +179,12 @@ function App() {
             <Route path="/admin/notices" element={<AdminNoticesPage />} />
           </Route>
         </Route>
+
+        {/* ====================================================
+            FALLBACK
+        ===================================================== */}
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

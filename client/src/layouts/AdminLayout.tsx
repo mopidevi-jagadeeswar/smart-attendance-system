@@ -11,6 +11,23 @@ function AdminLayout() {
 
   const { user } = useAuth()
 
+  // ============================================================
+  // NORMALIZE USER DATA
+  // ============================================================
+  // AuthUser.full_name can be null.
+  // AdminSidebar and DashboardHeader expect undefined instead.
+  // This keeps the existing functionality unchanged.
+  const layoutUser = user
+    ? {
+        ...user,
+        full_name: user.full_name ?? undefined,
+      }
+    : null
+
+  // ============================================================
+  // SIDEBAR CONTROLS
+  // ============================================================
+
   const toggleSidebar = () => {
     setSidebarCollapsed((current) => !current)
   }
@@ -23,18 +40,21 @@ function AdminLayout() {
     setSidebarOpen(true)
   }
 
+  // ============================================================
+  // LAYOUT
+  // ============================================================
+
   return (
-    <div className="min-h-screen bg-neutral-950">
+    <div className="min-h-screen">
       {/* =====================================================
-          SIDEBAR
-          Dark theme remains unchanged
+          ADMIN SIDEBAR
       ====================================================== */}
 
       <AdminSidebar
         isOpen={sidebarOpen}
         isCollapsed={sidebarCollapsed}
         onClose={handleCloseSidebar}
-        user={user}
+        user={layoutUser}
       />
 
       {/* =====================================================
@@ -50,12 +70,11 @@ function AdminLayout() {
         `}
       >
         {/* ===================================================
-            SINGLE ADMIN HEADER
-            Dark navbar remains unchanged
+            ADMIN HEADER
         ===================================================== */}
 
         <DashboardHeader
-          user={user}
+          user={layoutUser}
           isSidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={toggleSidebar}
           onMenuClick={handleOpenSidebar}
@@ -63,7 +82,6 @@ function AdminLayout() {
 
         {/* ===================================================
             PAGE CONTENT
-            Light glass theme
         ===================================================== */}
 
         <main
@@ -71,7 +89,7 @@ function AdminLayout() {
             relative
             min-h-[calc(100vh-72px)]
             overflow-hidden
-            bg-gradient-to-br
+            bg-linear-to-br
             from-slate-100
             via-indigo-50
             to-sky-50
@@ -85,8 +103,8 @@ function AdminLayout() {
           "
         >
           {/* =================================================
-              BACKGROUND GLOW
-          ================================================= */}
+              BACKGROUND GLOW - LEFT
+          ================================================== */}
 
           <div
             className="
@@ -102,6 +120,10 @@ function AdminLayout() {
             "
           />
 
+          {/* =================================================
+              BACKGROUND GLOW - RIGHT
+          ================================================== */}
+
           <div
             className="
               pointer-events-none
@@ -115,6 +137,10 @@ function AdminLayout() {
               blur-[130px]
             "
           />
+
+          {/* =================================================
+              BACKGROUND GLOW - CENTER
+          ================================================== */}
 
           <div
             className="
@@ -132,8 +158,8 @@ function AdminLayout() {
           />
 
           {/* =================================================
-              PAGE CONTENT
-          ================================================= */}
+              CURRENT ADMIN PAGE
+          ================================================== */}
 
           <div className="relative z-10">
             <Outlet />

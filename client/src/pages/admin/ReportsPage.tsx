@@ -106,6 +106,24 @@ function getApiError(error: unknown): string {
   return 'Unable to load reports. Please try again.'
 }
 
+async function fetchReportsData(): Promise<ReportsResponse> {
+  const token = getAccessToken()
+
+  if (!token) {
+    throw new Error('Authentication token not found. Please log in again.')
+  }
+
+  const response = await axios.get<ReportsResponse>(REPORTS_URL, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    withCredentials: true,
+    timeout: 15000,
+  })
+
+  return response.data
+}
+
 // ============================================================
 // PAGE
 // ============================================================
@@ -129,29 +147,15 @@ function ReportsPage() {
   // LOAD REPORTS
   // ==========================================================
 
+  // Manual refresh logic
   const loadReports = useCallback(async () => {
-    const token = getAccessToken()
-
-    if (!token) {
-      setError('Authentication token not found. Please log in again.')
-      setLoading(false)
-      return
-    }
+    setLoading(true)
+    setError('')
 
     try {
-      setLoading(true)
-      setError('')
-
-      const response = await axios.get<ReportsResponse>(REPORTS_URL, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        withCredentials: true,
-        timeout: 15000,
-      })
-
-      setSummary(response.data.summary)
-      setRecords(response.data.records)
+      const data = await fetchReportsData()
+      setSummary(data.summary)
+      setRecords(data.records)
     } catch (requestError) {
       console.error('Failed to load reports:', requestError)
       setError(getApiError(requestError))
@@ -160,9 +164,33 @@ function ReportsPage() {
     }
   }, [])
 
+  // Initial load logic avoiding synchronous setState in effect
   useEffect(() => {
-    void loadReports()
-  }, [loadReports])
+    let ignore = false
+
+    const init = async () => {
+      try {
+        const data = await fetchReportsData()
+        if (!ignore) {
+          setSummary(data.summary)
+          setRecords(data.records)
+          setLoading(false)
+        }
+      } catch (requestError) {
+        if (!ignore) {
+          console.error('Failed to load reports:', requestError)
+          setError(getApiError(requestError))
+          setLoading(false)
+        }
+      }
+    }
+
+    void init()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   // ==========================================================
   // GRAPH DATA
@@ -264,7 +292,7 @@ function ReportsPage() {
   // ==========================================================
 
   return (
-    <div className="relative min-h-[calc(100vh-72px)] overflow-hidden bg-gradient-to-br from-slate-100 via-indigo-50 to-sky-50 text-slate-900">
+    <div className="relative min-h-[calc(100vh-72px)] overflow-hidden bg-linear-to-br from-slate-100 via-indigo-50 to-sky-50 text-slate-900">
       {/* Background glow */}
 
       <div className="pointer-events-none fixed -left-32 top-10 h-80 w-80 rounded-full bg-indigo-400/15 blur-[120px]" />
@@ -276,9 +304,9 @@ function ReportsPage() {
             HEADER
         ===================================================== */}
 
-        <section className="mb-4 flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-cyan-500/10 px-5 py-3.5 shadow-lg shadow-indigo-500/5 backdrop-blur-xl">
+        <section className="mb-4 flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-indigo-500/20 bg-linear-to-r from-indigo-500/10 via-purple-500/5 to-cyan-500/10 px-5 py-3.5 shadow-lg shadow-indigo-500/5 backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20">
               <FileBarChart size={19} />
             </div>
 
@@ -376,7 +404,7 @@ function ReportsPage() {
               <div className="flex-1 max-w-xs">
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-200/80">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 transition-all duration-700"
+                    className="h-full rounded-full bg-linear-to-r from-indigo-500 via-purple-500 to-cyan-500 transition-all duration-700"
                     style={{
                       width: `${Math.min(Math.max(summary.attendance_rate, 0), 100)}%`,
                     }}
@@ -697,7 +725,7 @@ function ChartCard({
         </div>
       </div>
 
-      <div className="relative mt-2 min-h-[210px] flex-1">{children}</div>
+      <div className="relative mt-2 min-h-52.5 flex-1">{children}</div>
     </div>
   )
 }
@@ -719,7 +747,7 @@ function ReportStatCard({
 }) {
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-3.5 shadow-lg backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-xl ${className}`}
+      className={`group relative overflow-hidden rounded-2xl border bg-linear-to-br p-3.5 shadow-lg backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-xl ${className}`}
     >
       <div className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-current opacity-[0.05] blur-2xl transition group-hover:scale-150" />
 

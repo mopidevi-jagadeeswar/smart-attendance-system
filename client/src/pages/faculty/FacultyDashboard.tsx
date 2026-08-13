@@ -171,7 +171,13 @@ function FacultyDashboard() {
   ========================================================== */
 
   useEffect(() => {
-    void loadDashboard()
+    const timeoutId = window.setTimeout(() => {
+      void loadDashboard()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [loadDashboard])
 
   /* ==========================================================
@@ -306,7 +312,11 @@ function FacultyDashboard() {
       ====================================================== */}
 
       <div className="fixed inset-x-0 top-0 z-50">
-        <DashboardHeader user={headerUser} onLogout={logout} />
+        <DashboardHeader user={headerUser} isSidebarCollapsed={false} onToggleSidebar={function (): void {
+          throw new Error('Function not implemented.')
+        } } onMenuClick={function (): void {
+          throw new Error('Function not implemented.')
+        } } />
       </div>
 
       {/* ======================================================

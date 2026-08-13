@@ -198,7 +198,9 @@ function HomePage() {
                 </span>
               </h1>
 
-              {/* Technology line */}
+              {/* =================================================
+                  TECHNOLOGY LINE
+              ================================================== */}
 
               <div
                 className="
@@ -209,26 +211,28 @@ function HomePage() {
                 "
               >
                 <span className="flex items-center gap-1.5 text-red-400">
-                  <ScanFace size={14} />
+                  <ScanFace size={20} />
                   Face Recognition
                 </span>
 
                 <span className="text-slate-700">•</span>
 
                 <span className="flex items-center gap-1.5 text-amber-400">
-                  <Smartphone size={14} />
+                  <Smartphone size={20} />
                   NFC
                 </span>
 
                 <span className="text-slate-700">•</span>
 
                 <span className="flex items-center gap-1.5 text-rose-400">
-                  <BarChart3 size={14} />
+                  <BarChart3 size={20} />
                   Behavioral Analytics
                 </span>
               </div>
 
-              {/* Description */}
+              {/* =================================================
+                  PROFESSIONAL DESCRIPTION
+              ================================================== */}
 
               <p
                 className="
@@ -238,8 +242,9 @@ function HomePage() {
                   sm:text-[15px]
                 "
               >
-                Smart attendance powered by face recognition, NFC authentication, and real-time
-                verification.
+                A modern attendance management platform designed to automate identity verification,
+                simplify attendance tracking, and deliver meaningful behavioral insights through
+                intelligent biometric and NFC-based technologies.
               </p>
 
               {/* =================================================
@@ -248,109 +253,136 @@ function HomePage() {
 
               <div
                 className="
-                  mt-7 grid max-w-xl
-                  grid-cols-1 gap-2.5
+                  mt-7 grid max-w-2xl
+                  grid-cols-1 gap-3
                   sm:grid-cols-3
                 "
               >
-                {/* Face */}
+                {/* =================================================
+                    FACE RECOGNITION
+                ================================================== */}
 
                 <div
                   className="
-                    group rounded-xl
-                    border border-white/7
-                    bg-white/2
-                    px-3.5 py-3
+                    group rounded-2xl
+                    border border-white/10
+                    bg-white/3
+                    p-4
+                    backdrop-blur-sm
                     transition-all duration-300
                     hover:-translate-y-1
                     hover:border-red-500/30
-                    hover:bg-red-500/3.5
+                    hover:bg-red-500/5
                   "
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-3">
                     <div
                       className="
-                        flex h-8 w-8
+                        flex h-10 w-10 shrink-0
                         items-center justify-center
-                        rounded-lg
+                        rounded-xl
+                        border border-red-500/20
                         bg-red-500/10
+                        text-red-400
+                        transition-all duration-300
+                        group-hover:bg-red-500/15
                       "
                     >
-                      <ScanFace size={16} strokeWidth={1.8} className="text-red-400" />
+                      <ScanFace size={18} strokeWidth={1.8} />
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-semibold text-slate-200">Face Recognition</p>
+                      <p className="text-xs font-bold text-slate-200">Face Recognition</p>
 
-                      <p className="mt-0.5 text-[8px] text-slate-600">Secure verification</p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Secure identity verification
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* NFC */}
+                {/* =================================================
+                    NFC
+                ================================================== */}
 
                 <div
                   className="
-                    group rounded-xl
-                    border border-white/7
-                    bg-white/2
-                    px-3.5 py-3
+                    group rounded-2xl
+                    border border-white/10
+                    bg-white/3
+                    p-4
+                    backdrop-blur-sm
                     transition-all duration-300
                     hover:-translate-y-1
                     hover:border-amber-500/30
-                    hover:bg-amber-500/3.5
+                    hover:bg-amber-500/5
                   "
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-3">
                     <div
                       className="
-                        flex h-8 w-8
+                        flex h-10 w-10 shrink-0
                         items-center justify-center
-                        rounded-lg
+                        rounded-xl
+                        border border-amber-500/20
                         bg-amber-500/10
+                        text-amber-400
+                        transition-all duration-300
+                        group-hover:bg-amber-500/15
                       "
                     >
-                      <Smartphone size={16} strokeWidth={1.8} className="text-amber-400" />
+                      <Smartphone size={18} strokeWidth={1.8} />
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-semibold text-slate-200">NFC Attendance</p>
+                      <p className="text-xs font-bold text-slate-200">NFC Attendance</p>
 
-                      <p className="mt-0.5 text-[8px] text-slate-600">Fast authentication</p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Fast contactless authentication
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Analytics */}
+                {/* =================================================
+                    ANALYTICS
+                ================================================== */}
 
                 <div
                   className="
-                    group rounded-xl
-                    border border-white/7
-                    bg-white/2
-                    px-3.5 py-3
+                    group rounded-2xl
+                    border border-white/10
+                    bg-white/3
+                    p-4
+                    backdrop-blur-sm
                     transition-all duration-300
                     hover:-translate-y-1
                     hover:border-rose-500/30
-                    hover:bg-rose-500/3.5
+                    hover:bg-rose-500/5
                   "
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-3">
                     <div
                       className="
-                        flex h-8 w-8
+                        flex h-10 w-10 shrink-0
                         items-center justify-center
-                        rounded-lg
+                        rounded-xl
+                        border border-rose-500/20
                         bg-rose-500/10
+                        text-rose-400
+                        transition-all duration-300
+                        group-hover:bg-rose-500/15
                       "
                     >
-                      <BarChart3 size={16} strokeWidth={1.8} className="text-rose-400" />
+                      <BarChart3 size={18} strokeWidth={1.8} />
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-semibold text-slate-200">Smart Analytics</p>
+                      <p className="text-xs font-bold text-slate-200">Smart Analytics</p>
 
-                      <p className="mt-0.5 text-[8px] text-slate-600">Attendance insights</p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Behavioral attendance insights
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -422,7 +454,9 @@ function HomePage() {
                 </Link>
               </div>
 
-              {/* Security line */}
+              {/* =================================================
+                  SECURITY LINE
+              ================================================== */}
 
               <div
                 className="

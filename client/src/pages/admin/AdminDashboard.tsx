@@ -1,74 +1,1006 @@
-import { useEffect, useState } from 'react'
-import type { ElementType } from 'react'
-import type { AxiosError } from 'axios'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 import {
-  Activity,
   AlertTriangle,
   BarChart3,
   CheckCircle2,
-  ClipboardCheck,
-  Database,
-  FileText,
-  HardDrive,
-  ShieldCheck,
-  UserCheck,
+  Clock3,
+  FileBarChart,
+  Loader2,
+  PieChart as PieChartIcon,
+  RefreshCw,
+  TrendingUp,
+  UserRound,
   Users,
+  XCircle,
 } from 'lucide-react'
+
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { Link } from 'react-router-dom'
 
-import { useAuth } from '../../context/AuthContext'
 import apiClient from '../../api/client'
+import { useAuth } from '../../context/AuthContext'
 
-/* =========================================================
+/* ============================================================
    TYPES
-========================================================= */
+============================================================ */
 
-interface AttendanceTrendItem {
-  date: string
+interface ReportSummary {
+  total_records: number
   present: number
-  absent: number
   late: number
+  absent: number
+  attendance_rate: number
+  students: number
+  faculty: number
 }
 
-interface RecentActivityItem {
-  student_name?: string
-  student_id?: string
-  method?: string
-  status?: string
-  time?: string
-  timestamp?: string
+interface AttendanceRecord {
+  id: string
+  name: string
+  person_id: string
+  role: 'student' | 'faculty'
+  date: string
+  time: string
+  method: string
+  status: 'present' | 'late' | 'absent'
 }
 
-interface DashboardData {
-  total_students: number
-  total_faculty: number
-  total_admins: number
-  present_today: number
-  absent_today: number
-  late_today: number
-  attendance_percentage: number
-  attendance_trend: AttendanceTrendItem[]
-  recent_activity: RecentActivityItem[]
+interface ReportsResponse {
+  summary: ReportSummary
+  records: AttendanceRecord[]
 }
 
-interface ApiErrorResponse {
-  detail?: string
+/* ============================================================
+   DEFAULT SUMMARY
+============================================================ */
+
+const EMPTY_SUMMARY: ReportSummary = {
+  total_records: 0,
+  present: 0,
+  late: 0,
+  absent: 0,
+  attendance_rate: 0,
+  students: 0,
+  faculty: 0,
 }
 
-/* =========================================================
+/* ============================================================
+   ADMIN DASHBOARD
+============================================================ */
+
+function AdminDashboard() {
+  const { user } = useAuth()
+
+  const [summary, setSummary] = useState<ReportSummary>(EMPTY_SUMMARY)
+
+  const [records, setRecords] = useState<AttendanceRecord[]>([])
+
+  const [loading, setLoading] = useState(true)
+
+  const [error, setError] = useState('')
+
+  /* ==========================================================
+     ADMIN NAME
+  ========================================================== */
+
+  const displayName = user?.full_name?.trim() || user?.login_id || 'Administrator'
+
+  /* ==========================================================
+     LOAD LIVE REPORT DATA
+  ========================================================== */
+
+  const loadReports = useCallback(async () => {
+    try {
+      setError('')
+
+      const response = await apiClient.get<ReportsResponse>('/admin/reports')
+
+      const responseSummary = response.data?.summary ?? EMPTY_SUMMARY
+
+      const responseRecords = Array.isArray(response.data?.records) ? response.data.records : []
+
+      setSummary({
+        total_records: Number(responseSummary.total_records ?? 0),
+
+        present: Number(responseSummary.present ?? 0),
+
+        late: Number(responseSummary.late ?? 0),
+
+        absent: Number(responseSummary.absent ?? 0),
+
+        attendance_rate: Number(responseSummary.attendance_rate ?? 0),
+
+        students: Number(responseSummary.students ?? 0),
+
+        faculty: Number(responseSummary.faculty ?? 0),
+      })
+
+      setRecords(responseRecords)
+    } catch (requestError) {
+      console.error('Failed to load admin dashboard reports:', requestError)
+
+      let message = 'Unable to load dashboard data.'
+
+      if (typeof requestError === 'object' && requestError !== null && 'response' in requestError) {
+        const axiosError = requestError as {
+          response?: {
+            status?: number
+            data?: {
+              detail?: string
+            }
+          }
+          message?: string
+        }
+
+        if (axiosError.response?.status === 401) {
+          message = 'Your admin session has expired. Please log in again.'
+        } else if (axiosError.response?.status === 403) {
+          message = 'You do not have permission to view dashboard reports.'
+        } else if (axiosError.response?.status === 404) {
+          message = 'The /admin/reports endpoint was not found.'
+        } else if (axiosError.response?.data?.detail) {
+          message = axiosError.response.data.detail
+        } else if (axiosError.message) {
+          message = axiosError.message
+        }
+      }
+
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  /* ==========================================================
+     INITIAL LOAD
+  ========================================================== */
+
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      await Promise.resolve().then(() => loadReports())
+    }
+
+    void initializeDashboard()
+  }, [loadReports])
+
+  /* ==========================================================
+     AUTO REFRESH
+     Refresh every 30 seconds
+  ========================================================== */
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void loadReports()
+    }, 30000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [loadReports])
+
+  /* ==========================================================
+     STATUS CHART
+  ========================================================== */
+
+  const statusChartData = useMemo(
+    () => [
+      {
+        name: 'Present',
+        count: records.filter((record) => record.status === 'present').length,
+      },
+      {
+        name: 'Late',
+        count: records.filter((record) => record.status === 'late').length,
+      },
+      {
+        name: 'Absent',
+        count: records.filter((record) => record.status === 'absent').length,
+      },
+    ],
+    [records]
+  )
+
+  /* ==========================================================
+     ROLE CHART
+  ========================================================== */
+
+  const roleChartData = useMemo(
+    () => [
+      {
+        name: 'Students',
+        count: records.filter((record) => record.role === 'student').length,
+      },
+      {
+        name: 'Faculty',
+        count: records.filter((record) => record.role === 'faculty').length,
+      },
+    ],
+    [records]
+  )
+
+  /* ==========================================================
+     METHOD CHART
+  ========================================================== */
+
+  const methodChartData = useMemo(() => {
+    const counts: Record<string, number> = {}
+
+    records.forEach((record) => {
+      const method = record.method?.trim()
+        ? record.method.charAt(0).toUpperCase() + record.method.slice(1)
+        : 'Unknown'
+
+      counts[method] = (counts[method] ?? 0) + 1
+    })
+
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      count,
+    }))
+  }, [records])
+
+  /* ==========================================================
+     TREND CHART
+  ========================================================== */
+
+  const trendChartData = useMemo(() => {
+    const grouped: Record<
+      string,
+      {
+        present: number
+        late: number
+        absent: number
+      }
+    > = {}
+
+    records.forEach((record) => {
+      if (!grouped[record.date]) {
+        grouped[record.date] = {
+          present: 0,
+          late: 0,
+          absent: 0,
+        }
+      }
+
+      if (record.status === 'present') {
+        grouped[record.date].present += 1
+      }
+
+      if (record.status === 'late') {
+        grouped[record.date].late += 1
+      }
+
+      if (record.status === 'absent') {
+        grouped[record.date].absent += 1
+      }
+    })
+
+    return Object.entries(grouped)
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .slice(-10)
+      .map(([date, values]) => ({
+        date: formatShortDate(date),
+        present: values.present,
+        late: values.late,
+        absent: values.absent,
+      }))
+  }, [records])
+
+  /* ==========================================================
+     TODAY'S RECORDS
+  ========================================================== */
+
+  const todayRecords = useMemo(() => {
+    const today = new Date()
+
+    const todayString =
+      `${today.getFullYear()}-` +
+      `${String(today.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(today.getDate()).padStart(2, '0')}`
+
+    return records.filter((record) => record.date === todayString)
+  }, [records])
+
+  /* ==========================================================
+     TODAY STATUS
+  ========================================================== */
+
+  const todayPresent = useMemo(
+    () => todayRecords.filter((record) => record.status === 'present').length,
+    [todayRecords]
+  )
+
+  const todayLate = useMemo(
+    () => todayRecords.filter((record) => record.status === 'late').length,
+    [todayRecords]
+  )
+
+  const todayAbsent = useMemo(
+    () => todayRecords.filter((record) => record.status === 'absent').length,
+    [todayRecords]
+  )
+
+  /* ==========================================================
+     LOADING STATE
+  ========================================================== */
+
+  if (loading) {
+    return (
+      <div className="relative flex min-h-[70vh] items-center justify-center overflow-hidden bg-slate-100">
+        <div className="pointer-events-none absolute -left-32 top-10 h-80 w-80 rounded-full bg-pink-300/25 blur-3xl" />
+
+        <div className="pointer-events-none absolute right-0 top-10 h-96 w-96 rounded-full bg-blue-300/25 blur-3xl" />
+
+        <div className="pointer-events-none absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-purple-300/20 blur-3xl" />
+
+        <div className="relative z-10 rounded-2xl border border-white/80 bg-white/70 px-10 py-8 text-center shadow-xl backdrop-blur-2xl">
+          <Loader2 size={32} className="mx-auto animate-spin text-indigo-600" />
+
+          <p className="mt-4 text-sm font-bold text-slate-900">Loading dashboard</p>
+
+          <p className="mt-1 text-xs text-slate-500">Fetching live attendance data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  /* ==========================================================
+     MAIN
+  ========================================================== */
+
+  return (
+    <div className="relative min-h-full overflow-hidden bg-slate-100 pb-10 text-slate-950">
+      {/* ======================================================
+          RAINBOW BACKGROUND
+      ====================================================== */}
+
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-32 top-0 h-80 w-80 rounded-full bg-pink-300/25 blur-3xl" />
+
+        <div className="absolute right-0 top-10 h-96 w-96 rounded-full bg-blue-300/25 blur-3xl" />
+
+        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-purple-300/20 blur-3xl" />
+
+        <div className="absolute bottom-10 right-1/4 h-72 w-72 rounded-full bg-amber-200/20 blur-3xl" />
+      </div>
+
+      <div className="relative z-10">
+        {/* ====================================================
+            HEADER
+        ===================================================== */}
+
+        <section className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-indigo-500" />
+
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+                Admin Dashboard
+              </p>
+            </div>
+
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              System Overview
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Welcome back, <span className="font-bold text-slate-900">{displayName}</span>. Monitor
+              your attendance system using live database data.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* LIVE STATUS */}
+
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white/70 px-3.5 py-2.5 shadow-sm backdrop-blur-xl">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+
+                <span className="relative h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              </span>
+
+              <span className="text-[10px] font-bold text-emerald-700">LIVE</span>
+            </div>
+
+            {/* REFRESH */}
+
+            <button
+              type="button"
+              onClick={() => {
+                void loadReports()
+              }}
+              className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-white/70 px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-xl transition hover:bg-white"
+            >
+              <RefreshCw size={14} className="text-indigo-600" />
+              Refresh
+            </button>
+          </div>
+        </section>
+
+        {/* ====================================================
+            ERROR
+        ===================================================== */}
+
+        {error && (
+          <div className="mt-5 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-xs font-semibold text-red-700 shadow-sm backdrop-blur-xl">
+            <AlertTriangle size={17} />
+
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* ====================================================
+            LIVE SUMMARY
+        ===================================================== */}
+
+        <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Records"
+            value={summary.total_records}
+            description="Attendance records"
+            icon={BarChart3}
+            iconColor="text-indigo-600"
+            iconBackground="bg-indigo-50"
+          />
+
+          <StatCard
+            title="Present"
+            value={summary.present}
+            description="Verified attendance"
+            icon={CheckCircle2}
+            iconColor="text-emerald-600"
+            iconBackground="bg-emerald-50"
+            valueColor="text-emerald-600"
+          />
+
+          <StatCard
+            title="Late"
+            value={summary.late}
+            description="Late attendance"
+            icon={Clock3}
+            iconColor="text-amber-600"
+            iconBackground="bg-amber-50"
+            valueColor="text-amber-600"
+          />
+
+          <StatCard
+            title="Absent"
+            value={summary.absent}
+            description="Absent records"
+            icon={XCircle}
+            iconColor="text-red-600"
+            iconBackground="bg-red-50"
+            valueColor="text-red-600"
+          />
+        </section>
+
+        {/* ====================================================
+            PEOPLE + ATTENDANCE RATE
+        ===================================================== */}
+
+        <section className="mt-5 grid gap-4 lg:grid-cols-3">
+          {/* Attendance Rate */}
+
+          <div className="rounded-2xl border border-white/75 bg-white/65 p-5 shadow-[0_14px_45px_rgba(71,85,105,0.08)] backdrop-blur-2xl lg:col-span-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Attendance Rate
+                </p>
+
+                <p className="mt-2 text-3xl font-black text-slate-950">
+                  {summary.attendance_rate.toFixed(1)}%
+                </p>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <TrendingUp size={20} />
+              </div>
+            </div>
+
+            <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-linear-to-r from-pink-500 via-indigo-500 to-cyan-400 transition-all duration-700"
+                style={{
+                  width: `${Math.min(Math.max(summary.attendance_rate, 0), 100)}%`,
+                }}
+              />
+            </div>
+
+            <p className="mt-2 text-[10px] font-medium text-slate-500">
+              Calculated from live attendance records.
+            </p>
+          </div>
+
+          {/* Students */}
+
+          <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50/60 p-5 shadow-sm backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+                <Users size={20} />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Students
+                </p>
+
+                <p className="mt-1 text-2xl font-black text-slate-950">{summary.students}</p>
+
+                <p className="text-[10px] font-medium text-slate-500">Attendance participants</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Faculty */}
+
+          <div className="flex items-center justify-between rounded-2xl border border-purple-100 bg-purple-50/60 p-5 shadow-sm backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-purple-600 shadow-sm">
+                <UserRound size={20} />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Faculty
+                </p>
+
+                <p className="mt-1 text-2xl font-black text-slate-950">{summary.faculty}</p>
+
+                <p className="text-[10px] font-medium text-slate-500">Attendance participants</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ====================================================
+            TODAY'S ATTENDANCE
+        ===================================================== */}
+
+        <section className="mt-5 rounded-2xl border border-white/75 bg-white/65 p-5 shadow-[0_14px_45px_rgba(71,85,105,0.08)] backdrop-blur-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-black text-slate-950">Today's Attendance</h2>
+
+              <p className="mt-1 text-xs text-slate-500">Live records received for today.</p>
+            </div>
+
+            <CheckCircle2 size={20} className="text-emerald-600" />
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <TodayCard title="Present" value={todayPresent} color="emerald" />
+
+            <TodayCard title="Late" value={todayLate} color="amber" />
+
+            <TodayCard title="Absent" value={todayAbsent} color="red" />
+          </div>
+        </section>
+
+        {/* ====================================================
+            CHARTS
+        ===================================================== */}
+
+        <section className="mt-5 grid gap-5 xl:grid-cols-2">
+          {/* Attendance Trend */}
+
+          <ChartCard
+            title="Attendance Trend"
+            subtitle="Live daily attendance records"
+            icon={<TrendingUp size={17} />}
+          >
+            {trendChartData.length === 0 ? (
+              <ChartEmpty />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={trendChartData}
+                  margin={{
+                    top: 10,
+                    right: 10,
+                    left: -20,
+                    bottom: 0,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.12)" />
+
+                  <XAxis
+                    dataKey="date"
+                    tick={{
+                      fontSize: 9,
+                      fill: '#64748b',
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{
+                      fontSize: 9,
+                      fill: '#64748b',
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: '1px solid rgba(99,102,241,0.15)',
+                      background: 'rgba(255,255,255,0.96)',
+                      boxShadow: '0 12px 30px rgba(15,23,42,0.12)',
+                      fontSize: '10px',
+                    }}
+                  />
+
+                  <Legend
+                    wrapperStyle={{
+                      fontSize: '10px',
+                    }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="present"
+                    name="Present"
+                    stroke="#10b981"
+                    strokeWidth={2.5}
+                    dot={{ r: 2.5 }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="late"
+                    name="Late"
+                    stroke="#f59e0b"
+                    strokeWidth={2.5}
+                    dot={{ r: 2.5 }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="absent"
+                    name="Absent"
+                    stroke="#ef4444"
+                    strokeWidth={2.5}
+                    dot={{ r: 2.5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Status */}
+
+          <ChartCard
+            title="Attendance Status"
+            subtitle="Live present, late, and absent distribution"
+            icon={<BarChart3 size={17} />}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={statusChartData}
+                margin={{
+                  top: 10,
+                  right: 10,
+                  left: -20,
+                  bottom: 0,
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.12)" />
+
+                <XAxis
+                  dataKey="name"
+                  tick={{
+                    fontSize: 9,
+                    fill: '#64748b',
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+                <YAxis
+                  allowDecimals={false}
+                  tick={{
+                    fontSize: 9,
+                    fill: '#64748b',
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                    background: 'rgba(255,255,255,0.96)',
+                    fontSize: '10px',
+                  }}
+                />
+
+                <Bar dataKey="count" name="Records" radius={[7, 7, 0, 0]}>
+                  {statusChartData.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={
+                        entry.name === 'Present'
+                          ? '#10b981'
+                          : entry.name === 'Late'
+                            ? '#f59e0b'
+                            : '#ef4444'
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          {/* Role */}
+
+          <ChartCard
+            title="Attendance by Role"
+            subtitle="Live student and faculty records"
+            icon={<Users size={17} />}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={roleChartData}
+                margin={{
+                  top: 10,
+                  right: 15,
+                  left: -15,
+                  bottom: 0,
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.12)" />
+
+                <XAxis
+                  dataKey="name"
+                  tick={{
+                    fontSize: 9,
+                    fill: '#64748b',
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+                <YAxis
+                  allowDecimals={false}
+                  tick={{
+                    fontSize: 9,
+                    fill: '#64748b',
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                    background: 'rgba(255,255,255,0.96)',
+                    fontSize: '10px',
+                  }}
+                />
+
+                <Bar dataKey="count" name="Records" radius={[8, 8, 0, 0]}>
+                  <Cell fill="#3b82f6" />
+                  <Cell fill="#8b5cf6" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          {/* Methods */}
+
+          <ChartCard
+            title="Attendance Methods"
+            subtitle="Live verification method distribution"
+            icon={<PieChartIcon size={17} />}
+          >
+            {methodChartData.length === 0 ? (
+              <ChartEmpty />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={methodChartData}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={82}
+                    innerRadius={45}
+                    paddingAngle={3}
+                  >
+                    {methodChartData.map((entry, index) => (
+                      <Cell
+                        key={entry.name}
+                        fill={['#6366f1', '#06b6d4', '#8b5cf6', '#f59e0b'][index % 4]}
+                      />
+                    ))}
+                  </Pie>
+
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: '1px solid rgba(99,102,241,0.15)',
+                      background: 'rgba(255,255,255,0.96)',
+                      fontSize: '10px',
+                    }}
+                  />
+
+                  <Legend
+                    wrapperStyle={{
+                      fontSize: '10px',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+        </section>
+
+        {/* ====================================================
+            REPORTS
+        ===================================================== */}
+
+        <section className="mt-5 rounded-2xl border border-white/75 bg-white/65 p-5 shadow-[0_14px_45px_rgba(71,85,105,0.08)] backdrop-blur-2xl">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <FileBarChart size={18} className="text-indigo-600" />
+
+                <h2 className="text-base font-black text-slate-950">Reports & Analytics</h2>
+              </div>
+
+              <p className="mt-1 text-xs text-slate-500">
+                All report statistics above are loaded from the live Reports API.
+              </p>
+            </div>
+
+            <Link
+              to="/admin/reports"
+              className="flex w-fit items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+            >
+              <FileBarChart size={14} />
+              Open Full Reports
+            </Link>
+          </div>
+        </section>
+
+        {/* ====================================================
+            RECENT LIVE RECORDS
+        ===================================================== */}
+
+        <section className="mt-5 rounded-2xl border border-white/75 bg-white/65 p-5 shadow-[0_14px_45px_rgba(71,85,105,0.08)] backdrop-blur-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-black text-slate-950">Recent Attendance</h2>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Latest records received from the Reports API.
+              </p>
+            </div>
+
+            <Link
+              to="/admin/history"
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+            >
+              View History →
+            </Link>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            {records.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <BarChart3 size={30} className="text-slate-300" />
+
+                <p className="mt-3 text-xs font-semibold text-slate-500">
+                  No attendance records found.
+                </p>
+              </div>
+            ) : (
+              <table className="w-full min-w-180 text-left">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Person
+                    </th>
+
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Role
+                    </th>
+
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Date
+                    </th>
+
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Time
+                    </th>
+
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Method
+                    </th>
+
+                    <th className="pb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {records.slice(0, 10).map((record) => (
+                    <tr key={record.id} className="transition hover:bg-indigo-50/50">
+                      <td className="py-3.5">
+                        <p className="text-xs font-bold text-slate-900">{record.name}</p>
+
+                        <p className="mt-0.5 text-[10px] text-slate-500">{record.person_id}</p>
+                      </td>
+
+                      <td className="py-3.5">
+                        <span
+                          className={`rounded-lg px-2.5 py-1 text-[9px] font-bold ${
+                            record.role === 'student'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-purple-50 text-purple-700'
+                          }`}
+                        >
+                          {capitalize(record.role)}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 text-xs font-medium text-slate-600">
+                        {formatShortDate(record.date)}
+                      </td>
+
+                      <td className="py-3.5 text-xs font-medium text-slate-600">
+                        {record.time || '--'}
+                      </td>
+
+                      <td className="py-3.5">
+                        <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[9px] font-bold text-indigo-700">
+                          {record.method || 'Unknown'}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5">
+                        <StatusBadge status={record.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
    STAT CARD
-========================================================= */
-
-interface StatCardProps {
-  title: string
-  value: string | number
-  description: string
-  icon: ElementType
-  iconColor: string
-  valueColor?: string
-}
+============================================================ */
 
 function StatCard({
   title,
@@ -76,666 +1008,197 @@ function StatCard({
   description,
   icon: Icon,
   iconColor,
-  valueColor = 'text-white',
-}: StatCardProps) {
+  iconBackground,
+  valueColor = 'text-slate-950',
+}: {
+  title: string
+  value: number
+  description: string
+  icon: typeof BarChart3
+  iconColor: string
+  iconBackground: string
+  valueColor?: string
+}) {
   return (
-    <div className="group rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-5 shadow-lg backdrop-blur-xl transition-all duration-300 hover:border-white/[0.15] hover:bg-neutral-900/70">
+    <div className="rounded-2xl border border-white/75 bg-white/65 p-5 shadow-[0_14px_45px_rgba(71,85,105,0.08)] backdrop-blur-2xl transition hover:-translate-y-0.5 hover:bg-white/80">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-400">{title}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+            {title}
+          </p>
 
-          <p className={`mt-2 text-2xl font-bold tracking-tight ${valueColor}`}>{value}</p>
+          <p className={`mt-2 text-3xl font-black tracking-tight ${valueColor}`}>{value}</p>
 
-          <p className="mt-1.5 text-[11px] text-slate-500">{description}</p>
+          <p className="mt-1 text-[10px] font-medium text-slate-500">{description}</p>
         </div>
 
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] shadow-inner ${iconColor}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconBackground} ${iconColor}`}
         >
-          <Icon size={20} strokeWidth={1.8} />
+          <Icon size={20} />
         </div>
       </div>
     </div>
   )
 }
 
-/* =========================================================
-   ADMIN DASHBOARD
-========================================================= */
+/* ============================================================
+   TODAY CARD
+============================================================ */
 
-function AdminDashboard() {
-  const { user } = useAuth()
+function TodayCard({
+  title,
+  value,
+  color,
+}: {
+  title: string
+  value: number
+  color: 'emerald' | 'amber' | 'red'
+}) {
+  const styles = {
+    emerald: {
+      box: 'border-emerald-100 bg-emerald-50/70',
+      value: 'text-emerald-600',
+    },
 
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+    amber: {
+      box: 'border-amber-100 bg-amber-50/70',
+      value: 'text-amber-600',
+    },
 
-  const [loading, setLoading] = useState<boolean>(true)
-
-  const [error, setError] = useState<string | null>(null)
-
-  /* =======================================================
-     FETCH DASHBOARD DATA
-  ======================================================= */
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const response = await apiClient.get<DashboardData>('/api/v1/admin/dashboard/summary', {
-          signal: controller.signal,
-        })
-
-        if (!controller.signal.aborted) {
-          setDashboardData(response.data)
-        }
-      } catch (err) {
-        if (controller.signal.aborted) {
-          return
-        }
-
-        console.error('Failed to load admin dashboard:', err)
-
-        const axiosError = err as AxiosError<ApiErrorResponse>
-
-        setError(
-          axiosError.response?.data?.detail ||
-            axiosError.message ||
-            'Failed to load dashboard data.'
-        )
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    if (user) {
-      void fetchDashboardData()
-    } else {
-      setLoading(false)
-    }
-
-    return () => {
-      controller.abort()
-    }
-  }, [user])
-
-  /* =======================================================
-     LOADING STATE
-  ======================================================= */
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="relative flex h-14 w-14 items-center justify-center">
-            <span className="absolute h-14 w-14 animate-ping rounded-full bg-red-500/20" />
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-              <Activity size={22} className="animate-pulse text-red-400" />
-            </div>
-          </div>
-
-          <p className="mt-5 text-sm font-semibold text-slate-300">Loading dashboard...</p>
-
-          <p className="mt-1 text-xs text-slate-500">Fetching live system metrics & nodes</p>
-        </div>
-      </div>
-    )
+    red: {
+      box: 'border-red-100 bg-red-50/70',
+      value: 'text-red-600',
+    },
   }
-
-  /* =======================================================
-     ERROR STATE
-  ======================================================= */
-
-  if (error) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="w-full max-w-md rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-6 text-center backdrop-blur-xl">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10">
-            <AlertTriangle size={22} className="text-red-400" />
-          </div>
-
-          <h2 className="mt-4 text-base font-semibold text-white">Unable to load dashboard</h2>
-
-          <p className="mt-2 text-xs leading-relaxed text-slate-400">{error}</p>
-
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-6 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-500"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  /* =======================================================
-     SAFE DATA FALLBACKS
-  ======================================================= */
-
-  const data: DashboardData = dashboardData ?? {
-    total_students: 0,
-    total_faculty: 0,
-    total_admins: 0,
-    present_today: 0,
-    absent_today: 0,
-    late_today: 0,
-    attendance_percentage: 0,
-    attendance_trend: [],
-    recent_activity: [],
-  }
-
-  const displayName = user?.full_name || user?.login_id || 'Administrator'
-
-  /* =======================================================
-     DASHBOARD CONTENT
-
-     IMPORTANT:
-     AdminLayout is intentionally NOT used here.
-     AdminLayout already wraps this page through App.tsx.
-  ======================================================= */
 
   return (
-    <div className="mx-auto max-w-7xl pb-10">
-      {/* =================================================
-          DASHBOARD INTRO
-      ================================================== */}
+    <div className={`rounded-xl border p-5 ${styles[color].box}`}>
+      <p className="text-xs font-semibold text-slate-500">{title}</p>
 
-      <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)]" />
-
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-400">
-              Admin Dashboard
-            </p>
-          </div>
-
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            System Overview
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Welcome back, <span className="font-medium text-slate-200">{displayName}</span>. Monitor
-            your smart attendance infrastructure and real-time activity.
-          </p>
-        </div>
-
-        {/* Database Status */}
-
-        <div className="flex w-fit items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3 backdrop-blur-md">
-          <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-
-            <span className="relative h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-          </span>
-
-          <div>
-            <p className="text-xs font-semibold text-emerald-400">Database Connected</p>
-
-            <p className="text-[10px] text-slate-500">PostgreSQL Live</p>
-          </div>
-        </div>
-      </section>
-
-      {/* =================================================
-          STATISTICS
-      ================================================== */}
-
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Registered Students"
-          value={data.total_students}
-          description="Active student accounts"
-          icon={Users}
-          iconColor="text-blue-400 bg-blue-500/10 border-blue-500/20"
-        />
-
-        <StatCard
-          title="Registered Faculty"
-          value={data.total_faculty}
-          description="Active faculty members"
-          icon={UserCheck}
-          iconColor="text-violet-400 bg-violet-500/10 border-violet-500/20"
-        />
-
-        <StatCard
-          title="Administrators"
-          value={data.total_admins}
-          description="System administrators"
-          icon={ShieldCheck}
-          iconColor="text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-        />
-
-        <StatCard
-          title="Today's Attendance"
-          value={`${data.attendance_percentage}%`}
-          description="Overall verification rate"
-          icon={ClipboardCheck}
-          iconColor="text-orange-400 bg-orange-500/10 border-orange-500/20"
-          valueColor="text-orange-400"
-        />
-      </section>
-
-      {/* =================================================
-          ATTENDANCE OVERVIEW + TREND
-      ================================================== */}
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-2">
-        {/* Today's Attendance */}
-
-        <div className="rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-6 shadow-lg backdrop-blur-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">Today's Attendance</h2>
-
-              <p className="mt-1 text-xs text-slate-400">
-                Current attendance verification breakdown.
-              </p>
-            </div>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-400">
-              <ClipboardCheck size={20} />
-            </div>
-          </div>
-
-          <div className="mt-7 flex items-end justify-between">
-            <div>
-              <p className="text-4xl font-extrabold text-white">{data.attendance_percentage}%</p>
-
-              <p className="mt-1 text-xs text-slate-500">Overall success rate</p>
-            </div>
-
-            <span className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-1 text-xs font-semibold text-emerald-400">
-              Live Status
-            </span>
-          </div>
-
-          <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-red-600 via-rose-500 to-orange-400 shadow-[0_0_12px_rgba(239,68,68,0.5)] transition-all duration-700"
-              style={{
-                width: `${Math.min(Math.max(data.attendance_percentage, 0), 100)}%`,
-              }}
-            />
-          </div>
-
-          <div className="mt-7 grid grid-cols-3 gap-3">
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
-              <p className="text-xs text-slate-400">Present</p>
-
-              <p className="mt-1.5 text-2xl font-bold text-emerald-400">{data.present_today}</p>
-            </div>
-
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
-              <p className="text-xs text-slate-400">Absent</p>
-
-              <p className="mt-1.5 text-2xl font-bold text-red-400">{data.absent_today}</p>
-            </div>
-
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
-              <p className="text-xs text-slate-400">Late</p>
-
-              <p className="mt-1.5 text-2xl font-bold text-amber-400">{data.late_today}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Attendance Trend */}
-
-        <div className="rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-6 shadow-lg backdrop-blur-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">Attendance Trend</h2>
-
-              <p className="mt-1 text-xs text-slate-400">Historical daily attendance trends.</p>
-            </div>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-400">
-              <BarChart3 size={20} />
-            </div>
-          </div>
-
-          {data.attendance_trend.length === 0 ? (
-            <div className="flex h-52 items-center justify-center">
-              <div className="text-center">
-                <BarChart3 size={32} className="mx-auto text-slate-600" />
-
-                <p className="mt-3 text-xs text-slate-500">
-                  No attendance trend data recorded yet.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-6 space-y-4">
-              {data.attendance_trend.slice(-7).map((item) => {
-                const total = item.present + item.absent + item.late
-
-                const percentage = total > 0 ? (item.present / total) * 100 : 0
-
-                return (
-                  <div key={item.date} className="group">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-400">{item.date}</span>
-
-                      <span className="font-semibold text-slate-200">
-                        {Math.round(percentage)}%
-                      </span>
-                    </div>
-
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 group-hover:brightness-125"
-                        style={{
-                          width: `${Math.min(Math.max(percentage, 0), 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* =================================================
-          SYSTEM MANAGEMENT + HARDWARE
-      ================================================== */}
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-2">
-        {/* System Management */}
-
-        <div className="rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-6 shadow-lg backdrop-blur-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">System Management</h2>
-
-              <p className="mt-1 text-xs text-slate-400">Quick shortcuts to admin modules.</p>
-            </div>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-400">
-              <ShieldCheck size={20} />
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-3.5">
-            <Link
-              to="/admin/students"
-              className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/[0.04]"
-            >
-              <Users
-                size={20}
-                className="text-blue-400 transition-transform group-hover:scale-110"
-              />
-
-              <p className="mt-3 text-sm font-semibold text-white">Students</p>
-
-              <p className="mt-0.5 text-[11px] text-slate-500">Manage student records</p>
-            </Link>
-
-            <Link
-              to="/admin/faculty"
-              className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/[0.04]"
-            >
-              <UserCheck
-                size={20}
-                className="text-violet-400 transition-transform group-hover:scale-110"
-              />
-
-              <p className="mt-3 text-sm font-semibold text-white">Faculty</p>
-
-              <p className="mt-0.5 text-[11px] text-slate-500">Manage faculty staff</p>
-            </Link>
-
-            <Link
-              to="/admin/attendance"
-              className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/[0.04]"
-            >
-              <Database
-                size={20}
-                className="text-emerald-400 transition-transform group-hover:scale-110"
-              />
-
-              <p className="mt-3 text-sm font-semibold text-white">Attendance Logs</p>
-
-              <p className="mt-0.5 text-[11px] text-slate-500">Inspect real-time logs</p>
-            </Link>
-
-            <Link
-              to="/admin/reports"
-              className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/[0.04]"
-            >
-              <FileText
-                size={20}
-                className="text-orange-400 transition-transform group-hover:scale-110"
-              />
-
-              <p className="mt-3 text-sm font-semibold text-white">Reports</p>
-
-              <p className="mt-0.5 text-[11px] text-slate-500">Export CSV / PDF reports</p>
-            </Link>
-          </div>
-        </div>
-
-        {/* Hardware & Node Status */}
-
-        <div className="rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-6 shadow-lg backdrop-blur-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">Hardware & Node Status</h2>
-
-              <p className="mt-1 text-xs text-slate-400">Connected attendance & camera nodes.</p>
-            </div>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
-              <Activity size={20} />
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-3.5">
-            <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                  <HardDrive size={18} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-white">Gate A — NFC & Face Node</p>
-
-                  <p className="text-[10px] text-slate-500">Hardware verification endpoint</p>
-                </div>
-              </div>
-
-              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
-                Active
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-                  <HardDrive size={18} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-white">Face Recognition Service</p>
-
-                  <p className="text-[10px] text-slate-500">OpenCV Camera Stream Active</p>
-                </div>
-              </div>
-
-              <span className="rounded-full border border-blue-500/20 bg-blue-500/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-400">
-                Online
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
-                  <Database size={18} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-white">FastAPI Backend API</p>
-
-                  <p className="text-[10px] text-slate-500">REST API & WebSocket service</p>
-                </div>
-              </div>
-
-              <span className="rounded-full border border-violet-500/20 bg-violet-500/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-violet-400">
-                Online
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =================================================
-          RECENT ACTIVITY
-      ================================================== */}
-
-      <section className="mt-6 rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-6 shadow-lg backdrop-blur-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-white">Recent Attendance Activity</h2>
-
-            <p className="mt-1 text-xs text-slate-400">Live feed of student verification events.</p>
-          </div>
-
-          <Link
-            to="/admin/history"
-            className="text-xs font-semibold text-red-400 transition hover:text-red-300"
-          >
-            View Full History →
-          </Link>
-        </div>
-
-        <div className="mt-6 overflow-x-auto">
-          {data.recent_activity.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <FileText size={32} className="text-slate-600" />
-
-              <p className="mt-3 text-xs text-slate-500">No recent activity events recorded.</p>
-            </div>
-          ) : (
-            <table className="w-full min-w-[650px] text-left">
-              <thead>
-                <tr className="border-b border-white/[0.08]">
-                  <th className="pb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Student
-                  </th>
-
-                  <th className="pb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Verification Method
-                  </th>
-
-                  <th className="pb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Timestamp
-                  </th>
-
-                  <th className="pb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-white/[0.04]">
-                {data.recent_activity.map((activity, index) => (
-                  <tr
-                    key={`${activity.student_id ?? 'activity'}-${index}`}
-                    className="group hover:bg-white/[0.02]"
-                  >
-                    <td className="py-4">
-                      <p className="text-xs font-semibold text-white">
-                        {activity.student_name || activity.student_id || 'Unknown Student'}
-                      </p>
-
-                      {activity.student_id && (
-                        <p className="mt-0.5 text-[10px] text-slate-500">{activity.student_id}</p>
-                      )}
-                    </td>
-
-                    <td className="py-4">
-                      <span
-                        className={`rounded-lg border px-2.5 py-1 text-[10px] font-medium ${
-                          activity.method?.toLowerCase().includes('nfc')
-                            ? 'border-blue-500/20 bg-blue-500/10 text-blue-400'
-                            : 'border-red-500/20 bg-red-500/10 text-red-400'
-                        }`}
-                      >
-                        {activity.method || 'Face Recognition'}
-                      </span>
-                    </td>
-
-                    <td className="py-4 text-xs text-slate-300">
-                      {activity.time || activity.timestamp || '--'}
-                    </td>
-
-                    <td className="py-4">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
-                        <CheckCircle2 size={12} />
-
-                        {activity.status || 'Verified'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
-
-      {/* =================================================
-          BEHAVIORAL ANALYTICS
-      ================================================== */}
-
-      <section className="mt-6 rounded-2xl border border-white/[0.08] bg-neutral-900/40 p-6 shadow-lg backdrop-blur-xl">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <BarChart3 size={18} className="text-amber-400" />
-
-              <h2 className="text-base font-semibold text-white">
-                Behavioral Analytics & Anomalies
-              </h2>
-            </div>
-
-            <p className="mt-1 text-xs text-slate-400">
-              AI-powered behavioral deviation tracking for smart attendance.
-            </p>
-          </div>
-
-          <span className="flex w-fit items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.08] px-3 py-1.5 text-[10px] font-semibold text-amber-400">
-            <AlertTriangle size={13} />
-            System Active
-          </span>
-        </div>
-
-        <div className="mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <div className="flex items-center gap-3">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
-
-            <p className="text-xs font-medium text-slate-200">
-              Behavioral pattern analysis is running smoothly.
-            </p>
-          </div>
-
-          <p className="mt-2 pl-5 text-[11px] text-slate-500">
-            Any irregular check-in patterns or anomalies detected by the behavioral analytics engine
-            will be logged here.
-          </p>
-        </div>
-      </section>
+      <p className={`mt-2 text-3xl font-black ${styles[color].value}`}>{value}</p>
     </div>
   )
 }
+
+/* ============================================================
+   CHART CARD
+============================================================ */
+
+function ChartCard({
+  title,
+  subtitle,
+  icon,
+  children,
+}: {
+  title: string
+  subtitle: string
+  icon: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-white/75 bg-white/65 p-5 shadow-[0_14px_45px_rgba(71,85,105,0.08)] backdrop-blur-2xl">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-base font-black text-slate-950">{title}</h2>
+
+          <p className="mt-1 text-[10px] font-medium text-slate-500">{subtitle}</p>
+        </div>
+
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+          {icon}
+        </div>
+      </div>
+
+      <div className="mt-4 h-64">{children}</div>
+    </div>
+  )
+}
+
+/* ============================================================
+   CHART EMPTY
+============================================================ */
+
+function ChartEmpty() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+        <BarChart3 size={19} />
+      </div>
+
+      <p className="mt-3 text-xs font-bold text-slate-600">No graph data available</p>
+
+      <p className="mt-1 text-[10px] text-slate-400">Attendance records will appear here.</p>
+    </div>
+  )
+}
+
+/* ============================================================
+   STATUS BADGE
+============================================================ */
+
+function StatusBadge({ status }: { status: AttendanceRecord['status'] }) {
+  if (status === 'present') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-700">
+        <CheckCircle2 size={11} />
+        Present
+      </span>
+    )
+  }
+
+  if (status === 'late') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[9px] font-bold text-amber-700">
+        <Clock3 size={11} />
+        Late
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9px] font-bold text-red-700">
+      <XCircle size={11} />
+      Absent
+    </span>
+  )
+}
+
+/* ============================================================
+   DATE FORMATTER
+============================================================ */
+
+function formatShortDate(value: string): string {
+  if (!value) {
+    return '--'
+  }
+
+  const parsed = new Date(`${value}T00:00:00`)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return parsed.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+  })
+}
+
+/* ============================================================
+   CAPITALIZE
+============================================================ */
+
+function capitalize(value: string): string {
+  if (!value) {
+    return '--'
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/* ============================================================
+   EXPORT
+============================================================ */
 
 export default AdminDashboard

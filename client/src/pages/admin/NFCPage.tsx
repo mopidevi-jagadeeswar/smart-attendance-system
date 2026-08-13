@@ -617,7 +617,7 @@ export default function NFCPage() {
           {/* Table */}
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] bg-white text-left">
+            <table className="w-full min-w-250 bg-white text-left">
               <thead>
                 <tr className="border-b border-slate-200 bg-white text-black">
                   <th className="px-5 py-4 text-[10px] font-black uppercase tracking-[0.14em] text-black">
@@ -700,7 +700,7 @@ export default function NFCPage() {
       {/* Register Modal */}
 
       {showRegisterModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
             {/* Modal Header */}
 
